@@ -1,0 +1,8 @@
+- name: restart apache
+  service:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - httpd
+    - mariadb
+  listen: "myrestart services"

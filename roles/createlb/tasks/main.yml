@@ -1,0 +1,37 @@
+- name: example using security group rule descriptions
+  ec2_group:
+    aws_access_key: "{{ myaccesskey }}"
+    aws_secret_key: "{{ mysecretkey }}"
+    name: "{{ sgname }}"
+    description: Security Group for the instances
+    vpc_id: "{{ vpcid }}"
+    region: "{{ region }}"
+    rules:
+      - proto: tcp
+        ports:
+        - 80
+        cidr_ip: 0.0.0.0/0
+        rule_desc: allow all on port 80
+  register: weblbsg_output
+- name: "Create LB"
+  ec2_elb_lb:
+    aws_access_key: "{{ myaccesskey }}"
+    aws_secret_key: "{{ mysecretkey }}"
+    region: "{{ region }}"   
+    name: "mylb"
+    state: present
+    subnets: "{{ subnetid }}"
+    security_group_ids: "{{ weblbsg_output.group_id }}"
+    listeners:
+      - protocol: http # options are http, https, ssl, tcp
+        load_balancer_port: 80
+        instance_port: 80
+    instance_ids: "{{ webinstance_output | json_query('results[*].tagged_instances[0].id') }}"
+    health_check:
+      ping_protocol: http
+      ping_port: 80
+      ping_path: "/index.html"
+      response_timeout: 5
+      interval: 30
+      unhealthy_threshold: 2
+      healthy_threshold: 2

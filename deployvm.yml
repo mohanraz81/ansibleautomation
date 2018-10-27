@@ -1,0 +1,111 @@
+---
+- hosts: localhost
+  vars:
+    sgname: webinstsg
+    kpname: webkey
+    vmname: 
+      - webservers-1
+      - webservers-2
+  tasks:
+  - name: example using security group rule descriptions
+    ec2_group:
+      aws_access_key: "{{ myaccesskey }}"
+      aws_secret_key: "{{ mysecretkey }}"
+      name: "{{ sgname }}"
+      description: Security Group for the instances
+      vpc_id: "{{ vpcid }}"
+      region: "{{ region }}"
+      rules:
+        - proto: tcp
+          ports:
+          - 80
+          - 22
+          cidr_ip: 0.0.0.0/0
+          rule_desc: allow all on port 80
+    register: webinstsg_output
+  - debug:
+      var: webinstsg_output
+  - name: Create VMs
+    ec2:
+      aws_access_key: "{{ myaccesskey }}"
+      aws_secret_key: "{{ mysecretkey }}"
+      region: "{{ region }}"      
+      key_name: "{{ kpname }}"
+      group_id: "{{ webinstsg_output.group_id }}"
+      instance_type: "{{ instancetype }}"
+      image: "{{ myami }}"
+      vpc_subnet_id: "{{ item[0] }}" 
+      assign_public_ip: yes
+      instance_tags:
+        Name: "{{ item[1] }}"        
+      count_tag:
+        Name: "{{ item[1] }}"
+      exact_count: 1
+      wait: yes
+      wait_timeout: 120
+    with_together:
+      - "{{ subnetid }}" 
+      - "{{ vmname }}"   
+    register: webinstance_output
+  - debug:
+      var: webinstance_output
+  - debug:
+      msg: "{{ item[0] }}" 
+    loop: "{{ webinstance_output | json_query('results[*].tagged_instances[0].dns_name') }}"
+  - name: Wait 300 seconds for port 22 to become open and contain "OpenSSH"
+    wait_for:
+      port: 22
+      host: "{{ item[0] }}"
+      search_regex: OpenSSH
+      delay: 10
+    loop:
+      - "{{ webinstance_output | json_query('results[*].tagged_instances[0].dns_name') }}"
+  - name: add host to group 'just_created' with variable foo=42
+    add_host:
+      name: "{{ item[0] }}"
+      groups: webinstances
+      web_admin: mohan@y2ytech.com
+      ansible_user: ec2-user
+      ansible_ssh_private_key_file: /home/ec2-user/environment/webkey.pem
+      ansible_become: yes
+      ansible_connection: ssh
+    loop:
+      - "{{ webinstance_output | json_query('results[*].tagged_instances[0].dns_name') }}"
+- hosts: webinstances  
+  tasks:
+  - name: install the latest version of Apache
+    yum:
+      name: "{{ item }}"
+      state: latest
+    loop:
+      - httpd
+      - mariadb-server
+    register: installoutput
+  - debug:
+      var: installoutput
+  - name: Copy configuration
+    template:
+      src: /home/ec2-user/environment/ansibleautomation/httpd.j2
+      dest: /etc/httpd/conf/httpd.conf   
+    notify: "myrestart services"
+  - name: Copy code
+    template:
+      src: /home/ec2-user/environment/ansibleautomation/index.j2
+      dest: /var/www/html/index.html
+  - name: Start service httpd, if not started
+    service:
+      name: "{{ item }}"
+      state: started
+      enabled: yes
+    loop:
+      - httpd
+      - mariadb
+  handlers:
+  - name: restart apache
+    service:
+      name: "{{ item }}"
+      state: restarted
+    loop:
+      - httpd
+      - mariadb
+    listen: "myrestart services"

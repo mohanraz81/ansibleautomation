@@ -1,0 +1,38 @@
+- name: example using security group rule descriptions
+  ec2_group:
+    aws_access_key: "{{ myaccesskey }}"
+    aws_secret_key: "{{ mysecretkey }}"
+    name: "{{ sgname }}"
+    description: Security Group for the instances
+    vpc_id: "{{ vpcid }}"
+    region: "{{ region }}"
+    rules:
+      - proto: tcp
+        ports:
+        - 80
+        - 22
+        cidr_ip: 0.0.0.0/0
+        rule_desc: allow all on port 80
+  register: webinstsg_output
+- name: Create VMs
+  ec2:
+    aws_access_key: "{{ myaccesskey }}"
+    aws_secret_key: "{{ mysecretkey }}"
+    region: "{{ region }}"      
+    key_name: "{{ kpname }}"
+    group_id: "{{ webinstsg_output.group_id }}"
+    instance_type: "{{ instancetype }}"
+    image: "{{ myami }}"
+    vpc_subnet_id: "{{ item[0] }}" 
+    assign_public_ip: yes
+    instance_tags:
+      Name: "{{ item[1] }}"        
+    count_tag:
+      Name: "{{ item[1] }}"
+    exact_count: 1
+    wait: yes
+    wait_timeout: 120
+  with_together:
+    - "{{ subnetid }}" 
+    - "{{ vmname }}"
+  register: webinstance_output

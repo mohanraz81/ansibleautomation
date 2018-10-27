@@ -1,0 +1,8 @@
+<h1>This is a test webserver</h1>
+<h2>This is owned by "{{ web_admin }}"</h2>
+<ul>
+{% for user in users %}
+  <li>{{ user.username|e }}</li>
+{% endfor %}
+</ul>
+{{ ansible_hostname }}
