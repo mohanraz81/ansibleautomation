@@ -4,5 +4,4 @@
     host: "{{ item[0] }}"
     search_regex: OpenSSH
     delay: 10
-  loop:
-    - "{{ webinstance_output | json_query('results[*].tagged_instances[0].dns_name') }}"
+  loop: "{{ webinstance_output | json_query('results[*].tagged_instances[0].dns_name') }}"

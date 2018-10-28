@@ -3,3 +3,9 @@
   tasks:
   - include_role:
        name: createawsvms
+    tags:
+      - awsvm
+  - debug: 
+      msg: "test"
+    tags:
+      - awsvm
