@@ -23,7 +23,7 @@
     subnets: "{{ subnetid }}"
     security_group_ids: "{{ weblbsg_output.group_id }}"
     listeners:
-      - protocol: http # options are http, https, ssl, tcp
+      - protocol: http
         load_balancer_port: 80
         instance_port: 80
     instance_ids: "{{ webinstance_output | json_query('results[*].tagged_instances[0].id') }}"
