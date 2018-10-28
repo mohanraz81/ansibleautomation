@@ -1,0 +1,16 @@
+- name: example using security group rule descriptions
+  ec2_group:
+    aws_access_key: "{{ myaccesskey }}"
+    aws_secret_key: "{{ mysecretkey }}"
+    name: "{{ sgname }}"
+    description: Security Group for the instances
+    vpc_id: "{{ vpcid }}"
+    region: "{{ region }}"
+    rules:
+      - proto: tcp
+        ports:
+        - 80
+        - 22
+        cidr_ip: 0.0.0.0/0
+        rule_desc: allow all on port 80
+  register: webinstsg_output
