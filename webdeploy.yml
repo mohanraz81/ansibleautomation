@@ -10,8 +10,6 @@
 - hosts: webinstances
   tasks:
   - include_role:
-       name: nginxinc.nginx
-  - include_role:
        name: webserver
 - hosts: localhost
   tasks:
