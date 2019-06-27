@@ -1,0 +1,102 @@
+---
+- hosts: localhost
+  vars:
+    region: us-east-1
+    ami: ami-0205ca69a799d475c
+    type: t2.micro
+    vpc: vpc-0c65fdabb35f1a0d7
+    subnet:
+      - subnet-03fc41f345c0b91c3
+      - subnet-05f9fcbf8787dd0b7
+    names:
+      - webserver1
+      - webserver2
+    sgname: websgansible
+    lbsgname: weblbsgansible
+    kpname: webkey2506
+  tasks:
+    - name: example using security group rule descriptions
+      ec2_group:
+        name: "{{ sgname }}"
+        description: web security group
+        vpc_id: "{{ vpc }}"
+        region: "{{ region }}"
+        rules:
+          - proto: tcp
+            ports:
+              - 80
+              - 22
+            cidr_ip: 0.0.0.0/0
+            rule_desc: allow all on port 80 and 22
+      register: sgoutput
+    - debug:
+        var: sgoutput
+    - name: Create VMs
+      ec2:
+        region: "{{ region }}"      
+        key_name: "{{ kpname }}"
+        group_id: "{{ sgoutput.group_id }}"
+        instance_type: "{{ type }}"
+        image: "{{ ami }}"
+        vpc_subnet_id: "{{ item.0 }}" 
+        assign_public_ip: yes
+        instance_tags:
+          Name: "{{ item.1 }}"        
+        count_tag:
+          Name: "{{ item.1 }}"
+        exact_count: 1
+        wait: yes
+        wait_timeout: 120
+      with_together:
+        - "{{ subnet }}" 
+        - "{{ names }}"
+      register: webinstance_output
+    - name: example using security group rule descriptions
+      ec2_group:
+        name: "{{ lbsgname }}"
+        description: Security Group for the instances
+        vpc_id: "{{ vpc }}"
+        region: "{{ region }}"
+        rules:
+          - proto: tcp
+            ports:
+            - 80
+            cidr_ip: 0.0.0.0/0
+            rule_desc: allow all on port 80
+      register: weblbsg_output
+    - name: "Create LB"
+      ec2_elb_lb:
+        region: "{{ region }}"   
+        name: "mylb"
+        state: present
+        subnets: "{{ subnet }}"
+        security_group_ids: "{{ weblbsg_output.group_id }}"
+        listeners:
+          - protocol: http
+            load_balancer_port: 80
+            instance_port: 80
+        health_check:
+          ping_protocol: http
+          ping_port: 80
+          ping_path: "/index.html"
+          response_timeout: 5
+          interval: 30
+          unhealthy_threshold: 2
+          healthy_threshold: 2
+      register: mylb_output
+    - debug:
+        var: mylb_output
+    - ec2_elb:
+        region: "{{ region }}"  
+        instance_id: "{{ item.tagged_instances[0].id }}"
+        ec2_elbs: mylb
+        state: present
+      loop: "{{ webinstance_output.results }}"
+    - route53:
+        state: present
+        zone: student24.courseandlabs.com
+        record: myapp.student24.courseandlabs.com 
+        type: A
+        value: "{{ mylb_output.elb.dns_name }}"
+        alias: True
+        alias_hosted_zone_id: Z35SXDOTRQ7X7K
